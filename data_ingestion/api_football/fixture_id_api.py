@@ -7,14 +7,12 @@ import os
 def configure():
     load_dotenv()
 
-base_url = 'https://v3.football.api-sports.io' 
-
 league_ids = [39] 
 season = 2024             
 
 def get_fixtures_for_league(league_id: int, season: int) -> list[dict]:
     """Fetch fixture_id and date for a given league and season."""
-    url = f"{base_url}/fixtures"
+    url = f"{os.getenv('base_url')}/fixtures"
     headers = {
         "x-apisports-key": os.getenv('api_key')
     }
