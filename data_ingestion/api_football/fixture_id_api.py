@@ -1,14 +1,16 @@
-import requests
-import pandas as pd
-from dotenv import load_dotenv
 import os
+
+import pandas as pd
+import requests
+from dotenv import load_dotenv
+
+league_ids = [39]
+season = 2024
 
 
 def configure():
     load_dotenv()
 
-league_ids = [39] 
-season = 2024             
 
 def get_fixtures_for_league(league_id: int, season: int) -> list[dict]:
     """Fetch fixture_id and date for a given league and season."""
@@ -56,6 +58,7 @@ def get_all_fixtures(league_ids: list[int], season: int) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"], utc=True)
 
     return df
+
 
 def main():
     configure()
