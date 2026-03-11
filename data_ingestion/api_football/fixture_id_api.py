@@ -4,8 +4,8 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-league_ids = [39]
-season = 2024
+league_ids = [39] 
+seasons = [2024] 
 
 
 def configure():
@@ -37,6 +37,7 @@ def get_fixtures_for_league(league_id: int, season: int) -> list[dict]:
     return [
         {
             "league_id": league_id,
+            "season": season,
             "fixture_id": f["fixture"]["id"],
             "date": f["fixture"]["date"]
         }
@@ -44,17 +45,18 @@ def get_fixtures_for_league(league_id: int, season: int) -> list[dict]:
     ]
 
 
-def get_all_fixtures(league_ids: list[int], season: int) -> pd.DataFrame:
-    """Fetch fixtures for all leagues and return a combined DataFrame."""
+def get_all_fixtures(league_ids: list[int], seasons: list[int]) -> pd.DataFrame:
+    """Fetch fixtures for all leagues and seasons, return a combined DataFrame."""
     all_rows = []
 
-    for league_id in league_ids:
-        print(f"Fetching fixtures for league {league_id}, season {season}...")
-        rows = get_fixtures_for_league(league_id, season)
-        all_rows.extend(rows)
-        print(f"  → Found {len(rows)} fixtures")
+    for season in seasons:
+        for league_id in league_ids:
+            print(f"Fetching fixtures for league {league_id}, season {season}...")
+            rows = get_fixtures_for_league(league_id, season)
+            all_rows.extend(rows)
+            print(f"  → Found {len(rows)} fixtures")
 
-    df = pd.DataFrame(all_rows, columns=["league_id", "fixture_id", "date"])
+    df = pd.DataFrame(all_rows, columns=["league_id", "season", "fixture_id", "date"])
     df["date"] = pd.to_datetime(df["date"], utc=True)
 
     return df
@@ -62,7 +64,7 @@ def get_all_fixtures(league_ids: list[int], season: int) -> pd.DataFrame:
 
 def main():
     configure()
-    df = get_all_fixtures(league_ids, season)
+    df = get_all_fixtures(league_ids, seasons)
     print(df.head(10).to_string(index=False))
     print(f"\nTotal fixtures: {len(df)}")
     print(f"Columns: {list(df.columns)}")
