@@ -51,34 +51,36 @@ BRONZE_COLUMNS = [
 # football-data.co.uk CSV column mappings
 # ---------------------------------------------------------------------------
 
-# Preferred odds columns (Betfair Exchange)
-_BFE_ODDS = {"home_win_odds": "BFEH", "draw_odds": "BFED", "away_odds": "BFEA"}
-
-# Fallback odds columns (market average)
-_AVG_ODDS = {"home_win_odds": "AvgH", "draw_odds": "AvgD", "away_odds": "AvgA"}
-
-# Actual column names in football-data.co.uk files (no spaces)
-_BFE_COLS = {"BFE H": "BFEH", "BFE D": "BFED", "BFE A": "BFEA"}
+# Odds column priority — tried in order until one has data
+_ODDS_PRIORITY = [
+    ("BFEH", "BFED", "BFEA"),  # Betfair Exchange (preferred)
+    ("AvgH", "AvgD", "AvgA"),  # Market average
+    ("PSH",  "PSD",  "PSA"),   # Pinnacle (secondary fallback)
+]
 
 
 def _pick_odds_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Select BFEH/BFED/BFEA if present and non-null, otherwise fall back to
-    AvgH/AvgD/AvgA. Returns df with standardised home_win_odds/draw_odds/away_odds.
+    Select odds columns in priority order: BFEH → AvgH → PSH.
+    Uses the first set where all three columns exist and have non-null data.
+
+    Raises:
+        ValueError: if no recognised odds columns are found in the CSV.
     """
-    bfe_available = all(col in df.columns for col in ["BFEH", "BFED", "BFEA"])
-    bfe_has_data = bfe_available and df[["BFEH", "BFED", "BFEA"]].notna().any().all()
+    for h_col, d_col, a_col in _ODDS_PRIORITY:
+        cols = [h_col, d_col, a_col]
+        if all(c in df.columns for c in cols) and df[cols].notna().any().all():
+            df = df.copy()
+            df["home_win_odds"] = df[h_col]
+            df["draw_odds"] = df[d_col]
+            df["away_odds"] = df[a_col]
+            print(f"  Using odds columns: {h_col} / {d_col} / {a_col}")
+            return df
 
-    if bfe_has_data:
-        df["home_win_odds"] = df["BFEH"]
-        df["draw_odds"] = df["BFED"]
-        df["away_odds"] = df["BFEA"]
-    else:
-        df["home_win_odds"] = df["AvgH"]
-        df["draw_odds"] = df["AvgD"]
-        df["away_odds"] = df["AvgA"]
-
-    return df
+    raise ValueError(
+        "No recognised odds columns found in CSV. "
+        "Expected one of: BFEH/BFED/BFEA, AvgH/AvgD/AvgA, PSH/PSD/PSA."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +101,8 @@ def from_csv(csv_path: str) -> pd.DataFrame:
     Returns:
         DataFrame conforming to BRONZE_COLUMNS.
     """
-    raw = pd.read_csv(csv_path, dayfirst=True, parse_dates=["Date"])
+    raw = pd.read_csv(csv_path)
+    raw["Date"] = pd.to_datetime(raw["Date"], dayfirst=True)
 
     df = _pick_odds_columns(raw)
 
@@ -223,3 +226,68 @@ def upsert_bronze(new_df: pd.DataFrame) -> None:
     combined = combined.sort_values("date").reset_index(drop=True)
     save_bronze(combined)
     print(f"Bronze table updated: {len(combined)} total rows.")
+
+
+# ---------------------------------------------------------------------------
+# Processed files log (tracks which CSVs have already been loaded)
+# ---------------------------------------------------------------------------
+
+PROCESSED_LOG_PATH = _REPO_ROOT / ".data" / "bronze" / "processed_files.json"
+
+
+def _load_processed_log() -> set:
+    """Return the set of CSV filenames already loaded into bronze."""
+    if not PROCESSED_LOG_PATH.exists():
+        return set()
+    import json
+    return set(json.loads(PROCESSED_LOG_PATH.read_text()))
+
+
+def _save_processed_log(processed: set) -> None:
+    import json
+    PROCESSED_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROCESSED_LOG_PATH.write_text(json.dumps(sorted(processed), indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Main — build bronze table from all CSVs in data lake
+# ---------------------------------------------------------------------------
+
+
+def main():
+    """
+    Loop all CSVs in .data/data_lake/, skip already-processed files,
+    and upsert new data into the bronze table.
+    """
+    data_lake_path = _REPO_ROOT / ".data" / "data_lake"
+    csv_files = sorted(data_lake_path.glob("*.csv"))
+
+    if not csv_files:
+        print("No CSV files found in .data/data_lake/")
+        return
+
+    processed = _load_processed_log()
+    new_files = [f for f in csv_files if f.name not in processed]
+
+    if not new_files:
+        print("All CSV files already processed. Bronze table is up to date.")
+        return
+
+    print(f"Found {len(new_files)} new file(s) to process (skipping {len(processed)} already done).")
+
+    for csv_path in new_files:
+        print(f"\nProcessing: {csv_path.name}")
+        try:
+            df = from_csv(str(csv_path))
+            upsert_bronze(df)
+            processed.add(csv_path.name)
+            _save_processed_log(processed)
+            print(f"  OK: {csv_path.name} done ({len(df)} rows)")
+        except Exception as e:
+            print(f"  FAILED: {csv_path.name}: {e}")
+
+    print(f"\nDone. Bronze table at: {BRONZE_PATH}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,8 +1,8 @@
 """
-Feature Engineering Functions.
+Feature engineering — football prematch odds feature group.
 
-Fetches the latest fixture data from the API, computes features via feature_engineering,
-and writes the resulting feature DataFrame to the feature store for inference.
+Pure functions for computing odds-based features, plus build_features()
+which applies all of them to a bronze-schema DataFrame.
 """
 
 
@@ -224,3 +224,40 @@ def market_entropy(
         + p_draw_norm * np.log(p_draw_norm)
         + p_away_norm * np.log(p_away_norm)
     )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline entry point
+# ---------------------------------------------------------------------------
+
+
+def build_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply all prematch odds features to a bronze-schema DataFrame.
+
+    Expects columns: home_win_odds, draw_odds, away_odds.
+    Returns the input DataFrame with feature columns added.
+    """
+    df = df.copy()
+
+    p_home, p_draw, p_away = normalised_odds(
+        df["home_win_odds"], df["draw_odds"], df["away_odds"]
+    )
+    df["p_home_norm"] = p_home
+    df["p_draw_norm"] = p_draw
+    df["p_away_norm"] = p_away
+
+    df["implied_prob_home"] = implied_probability(df["home_win_odds"])
+    df["implied_prob_draw"] = implied_probability(df["draw_odds"])
+    df["implied_prob_away"] = implied_probability(df["away_odds"])
+
+    df["odds_spread"]    = odds_spread(df["home_win_odds"], df["away_odds"])
+    df["draw_margin"]    = draw_margin(df["home_win_odds"], df["draw_odds"], df["away_odds"])
+    df["favourite_odds"] = favourite_odds(df["home_win_odds"], df["draw_odds"], df["away_odds"])
+    df["odds_range"]     = odds_range(df["home_win_odds"], df["draw_odds"], df["away_odds"])
+    df["home_vs_draw"]   = home_vs_draw(df["home_win_odds"], df["draw_odds"])
+    df["away_vs_draw"]   = away_vs_draw(df["away_odds"], df["draw_odds"])
+    df["odds_std"]       = odds_std(df["home_win_odds"], df["draw_odds"], df["away_odds"])
+    df["market_entropy"] = market_entropy(df["p_home_norm"], df["p_draw_norm"], df["p_away_norm"])
+
+    return df
