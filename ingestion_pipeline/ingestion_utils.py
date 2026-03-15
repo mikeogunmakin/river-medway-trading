@@ -1,28 +1,34 @@
+"""
+Betfair Exchange API utilities.
+
+Handles authentication, market discovery, and odds fetching from the
+Betfair Exchange REST API. Used by bronze_football_prematch_odds.py.
+"""
+
 import os
-import requests
+from datetime import datetime, timezone
+
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+import requests
 from dotenv import load_dotenv
 
-# --- Config ---
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
 BETFAIR_API_URL = "https://api.betfair.com/exchange/betting/rest/v1.0"
 MATCH_ODDS_MARKET_TYPE = "MATCH_ODDS"
 SOCCER_EVENT_TYPE_ID = "1"
 SNAPSHOT_MINUTES_BEFORE = 60
 
-# Betfair competition IDs — add/remove as needed
-COMPETITION_IDS = [
-    "10932509",   # Premier League
-    "117",        # La Liga
-    "81",         # Bundesliga
-    "35",         # Serie A
-    "68",         # Ligue 1
-    "7129730",    # Champions League
-]
-
 
 def configure():
     load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
 
 
 def get_betfair_session_token() -> str:
@@ -58,6 +64,11 @@ def get_headers(session_token: str) -> dict:
         "X-Authentication": session_token,
         "Content-Type": "application/json",
     }
+
+
+# ---------------------------------------------------------------------------
+# Market discovery
+# ---------------------------------------------------------------------------
 
 
 def list_competitions(session_token: str) -> pd.DataFrame:
@@ -114,6 +125,11 @@ def get_match_odds_markets(
     markets = response.json()
     print(f"  → Found {len(markets)} MATCH_ODDS markets")
     return markets
+
+
+# ---------------------------------------------------------------------------
+# Odds fetching
+# ---------------------------------------------------------------------------
 
 
 def get_back_odds_for_markets(
@@ -224,35 +240,3 @@ def fetch_prematch_odds(
     df = parse_odds(markets, all_books)
     print(f"  → Parsed {len(df)} runner rows across {len(markets)} markets")
     return df
-
-
-def main():
-    configure()
-
-    # Uncomment to discover competition IDs available on Betfair
-    # session_token = get_betfair_session_token()
-    # print(list_competitions(session_token).to_string(index=False))
-    # return
-
-    now = datetime.now(timezone.utc)
-    from_time = now + timedelta(minutes=SNAPSHOT_MINUTES_BEFORE)
-    to_time = from_time + timedelta(hours=24)
-
-    df = fetch_prematch_odds(from_time, to_time, competition_ids=COMPETITION_IDS)
-
-    if df.empty:
-        print("No odds data to save.")
-        return df
-
-    print(df.head(10).to_string(index=False))
-    print(f"\nTotal rows: {len(df)}")
-
-    output_file = "betfair_prematch_odds.csv"
-    df.to_csv(output_file, index=False)
-    print(f"\n✓ Saved to {output_file}")
-
-    return df
-
-
-if __name__ == "__main__":
-    df = main()
