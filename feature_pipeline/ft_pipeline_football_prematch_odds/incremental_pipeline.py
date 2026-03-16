@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from ingestion_pipeline.bronze_football_prematch_odds import from_betfair_api, upsert_bronze, load_bronze
+from ingestion_pipeline.ing_pipeline_football_prematch_odds import from_betfair_api, upsert_bronze, load_bronze
 from ingestion_pipeline.ingestion_utils import COMPETITION_IDS
 from feature_pipeline.feature_engineering.prematch_odds import build_features
 

@@ -2,7 +2,7 @@
 Betfair Exchange API utilities.
 
 Handles authentication, market discovery, and odds fetching from the
-Betfair Exchange REST API. Used by bronze_football_prematch_odds.py.
+Betfair Exchange REST API. Used by ing_pipeline_football_prematch_odds.py.
 """
 
 import os

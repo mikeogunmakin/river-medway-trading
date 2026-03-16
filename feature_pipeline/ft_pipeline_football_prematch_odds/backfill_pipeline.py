@@ -7,7 +7,7 @@ and writes the resulting feature group to the feature store.
 
 import pandas as pd
 
-from ingestion_pipeline.bronze_football_prematch_odds import load_bronze
+from ingestion_pipeline.ing_pipeline_football_prematch_odds import load_bronze
 from feature_pipeline.feature_engineering.prematch_odds import build_features
 
 
