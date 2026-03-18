@@ -13,7 +13,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from ingestion_pipeline.ing_pipeline_football_prematch_odds import from_betfair_api, upsert_bronze, load_bronze
-from ingestion_pipeline.ingestion_utils import COMPETITION_IDS
+from feature_pipeline.ft_pipeline_football_prematch_odds.config import COMPETITION_IDS
 from feature_pipeline.feature_engineering.prematch_odds import build_features
 
 FEATURE_GROUP_NAME = "football_prematch_odds"
@@ -45,6 +45,7 @@ def write_to_feature_store(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
+    load_dotenv()
     now = datetime.now(timezone.utc)
     from_time = now + timedelta(minutes=60)
     to_time = from_time + timedelta(hours=24)
