@@ -1,10 +1,15 @@
 """
-League code mappings for football-data.co.uk CSV files.
+Configuration constants for the ingestion pipeline.
 
-To add a new league:
-  1. Find the league code from https://www.football-data.co.uk/data.php
-  2. Add an entry below: "CODE": "League Name"
+- LEAGUE_CODES: football-data.co.uk division codes → league names.
+  Add new codes from https://www.football-data.co.uk/data.php as needed.
+
+- Betfair API constants: endpoint, market type, and event type identifiers.
 """
+
+# ---------------------------------------------------------------------------
+# football-data.co.uk league codes
+# ---------------------------------------------------------------------------
 
 LEAGUE_CODES = {
     # England
@@ -48,16 +53,11 @@ LEAGUE_CODES = {
     "G1": "Super League Greece",
 }
 
+# ---------------------------------------------------------------------------
+# Betfair API
+# ---------------------------------------------------------------------------
 
-def get_league_name(code: str) -> str:
-    """
-    Return the league name for a given football-data.co.uk code.
-
-    Raises:
-        KeyError: if the code is not in LEAGUE_CODES — add it to league_config.py.
-    """
-    if code not in LEAGUE_CODES:
-        raise KeyError(
-            f"Unknown league code '{code}'. Add it to ingestion_pipeline/league_config.py."
-        )
-    return LEAGUE_CODES[code]
+BETFAIR_API_URL = "https://api.betfair.com/exchange/betting/rest/v1.0"
+MATCH_ODDS_MARKET_TYPE = "MATCH_ODDS"
+SOCCER_EVENT_TYPE_ID = "1"
+SNAPSHOT_MINUTES_BEFORE = 60

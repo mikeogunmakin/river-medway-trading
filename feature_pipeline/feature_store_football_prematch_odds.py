@@ -1,8 +1,8 @@
 """
-Backfill feature pipeline — football prematch odds.
+Hopsworks feature store — connection and write utilities.
 
-Reads the bronze odds table, computes features via feature_engineering.prematch_odds,
-and writes the resulting feature group to Hopsworks.
+Shared by all feature pipelines. Add new feature group writers here as
+additional sports/markets are onboarded.
 """
 
 import os
@@ -10,9 +10,6 @@ import os
 import hopsworks
 import pandas as pd
 from dotenv import load_dotenv
-
-from ingestion_pipeline.ing_pipeline_football_prematch_odds import load_bronze
-from feature_pipeline.feature_engineering.prematch_odds import build_features
 
 FEATURE_GROUP_NAME = "football_prematch_odds"
 FEATURE_GROUP_VERSION = 2
@@ -40,15 +37,3 @@ def write_to_feature_store(df: pd.DataFrame) -> None:
 
     fg.insert(df, write_options={"wait_for_job": True})
     print(f"  Written to feature group '{FEATURE_GROUP_NAME}' v{FEATURE_GROUP_VERSION}")
-
-
-def main() -> None:
-    df = load_bronze()
-    df = df[df["result"].notna()].copy()  # historical matches only
-    features = build_features(df)
-    write_to_feature_store(features)
-    print(f"Backfill complete. {len(features)} rows written to feature store.")
-
-
-if __name__ == "__main__":
-    main()
