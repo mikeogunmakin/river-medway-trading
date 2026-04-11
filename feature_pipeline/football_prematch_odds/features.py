@@ -14,29 +14,44 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 
-def normalised_odds(
+def normalised_prob(
     home_odds: pd.Series,
     draw_odds: pd.Series,
     away_odds: pd.Series,
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
     """
-    Normalise decimal odds so that the implied probabilities sum to exactly 1,
+    Convert raw decimal odds to normalised probabilities that sum to exactly 1,
     removing the bookmaker's overround (margin).
 
-    Raw implied probabilities (1/odds) sum to >1 because the book embeds a
-    margin. Normalising strips that margin and gives the market's 'true'
-    probability estimate for each outcome — a cleaner input for any model that
-    consumes probabilities rather than raw odds.
+    Used internally by normalised_odds() and directly by market_entropy().
 
     Returns:
-        (p_home_norm, p_draw_norm, p_away_norm) — three Series of normalised
-        probabilities, each in [0, 1], summing to 1 per row.
+        (p_home, p_draw, p_away) — three Series of normalised probabilities,
+        each in [0, 1], summing to 1 per row.
     """
     p_home = 1 / home_odds
     p_draw = 1 / draw_odds
     p_away = 1 / away_odds
     total = p_home + p_draw + p_away
     return p_home / total, p_draw / total, p_away / total
+
+
+def normalised_odds(
+    home_odds: pd.Series,
+    draw_odds: pd.Series,
+    away_odds: pd.Series,
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Convert raw decimal odds to fair odds by removing the bookmaker's overround.
+
+    Computes normalised probabilities via normalised_prob(), then converts back
+    to decimal odds (1 / p_norm), giving margin-free 'true' odds for each outcome.
+
+    Returns:
+        (fair_home, fair_draw, fair_away) — three Series of fair decimal odds.
+    """
+    p_home, p_draw, p_away = normalised_prob(home_odds, draw_odds, away_odds)
+    return 1 / p_home, 1 / p_draw, 1 / p_away
 
 
 def implied_probability(odds: pd.Series) -> pd.Series:
@@ -239,24 +254,30 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    p_home, p_draw, p_away = normalised_odds(
+    # Fair odds — raw odds with bookmaker margin removed
+    fair_home, fair_draw, fair_away = normalised_odds(
+        df["home_win_odds"], df["draw_odds"], df["away_odds"]
+    )
+
+    # Normalised probabilities — stored as features and used for implied probabilities and entropy
+    p_home, p_draw, p_away = normalised_prob(
         df["home_win_odds"], df["draw_odds"], df["away_odds"]
     )
     df["p_home_norm"] = p_home
     df["p_draw_norm"] = p_draw
     df["p_away_norm"] = p_away
 
-    df["implied_prob_home"] = implied_probability(df["home_win_odds"])
-    df["implied_prob_draw"] = implied_probability(df["draw_odds"])
-    df["implied_prob_away"] = implied_probability(df["away_odds"])
+    df["implied_prob_home"] = implied_probability(p_home)
+    df["implied_prob_draw"] = implied_probability(p_draw)
+    df["implied_prob_away"] = implied_probability(p_away)
 
-    df["odds_spread"]    = odds_spread(df["home_win_odds"], df["away_odds"])
-    df["draw_margin"]    = draw_margin(df["home_win_odds"], df["draw_odds"], df["away_odds"])
-    df["favourite_odds"] = favourite_odds(df["home_win_odds"], df["draw_odds"], df["away_odds"])
-    df["odds_range"]     = odds_range(df["home_win_odds"], df["draw_odds"], df["away_odds"])
-    df["home_vs_draw"]   = home_vs_draw(df["home_win_odds"], df["draw_odds"])
-    df["away_vs_draw"]   = away_vs_draw(df["away_odds"], df["draw_odds"])
-    df["odds_std"]       = odds_std(df["home_win_odds"], df["draw_odds"], df["away_odds"])
-    df["market_entropy"] = market_entropy(df["p_home_norm"], df["p_draw_norm"], df["p_away_norm"])
+    df["odds_spread"]    = odds_spread(fair_home, fair_away)
+    df["draw_margin"]    = draw_margin(fair_home, fair_draw, fair_away)
+    df["favourite_odds"] = favourite_odds(fair_home, fair_draw, fair_away)
+    df["odds_range"]     = odds_range(fair_home, fair_draw, fair_away)
+    df["home_vs_draw"]   = home_vs_draw(fair_home, fair_draw)
+    df["away_vs_draw"]   = away_vs_draw(fair_away, fair_draw)
+    df["odds_std"]       = odds_std(fair_home, fair_draw, fair_away)
+    df["market_entropy"] = market_entropy(p_home, p_draw, p_away)
 
     return df
