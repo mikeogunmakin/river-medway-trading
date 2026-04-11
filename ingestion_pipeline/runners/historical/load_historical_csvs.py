@@ -11,8 +11,8 @@ the bronze parquet table. Already-processed files are skipped via the log.
 from pathlib import Path
 
 from data_sources.csv_football_data import from_csv
-from ingestion.bronze_ingest import upsert_bronze
-from ingestion.processed_log import load_processed_log, save_processed_log
+from ingestion_pipeline.bronze_ingest import upsert_bronze
+from ingestion_pipeline.processed_log import load_processed_log, save_processed_log
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 

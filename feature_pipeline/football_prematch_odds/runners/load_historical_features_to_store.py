@@ -8,7 +8,7 @@ Reads bronze, selects completed historical matches, computes features,
 and writes to the Hopsworks feature store.
 """
 
-from ingestion.bronze_ingest import load_bronze
+from ingestion_pipeline.bronze_ingest import load_bronze
 from feature_pipeline.football_prematch_odds.features import build_features
 from feature_pipeline.football_prematch_odds.selectors import select_historical
 from feature_pipeline.football_prematch_odds.feature_store import write_to_feature_store

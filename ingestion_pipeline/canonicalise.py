@@ -7,7 +7,7 @@ conforming to BRONZE_COLUMNS.
 
 import pandas as pd
 
-from ingestion.bronze_ingest import BRONZE_COLUMNS
+from ingestion_pipeline.bronze_ingest import BRONZE_COLUMNS
 
 
 def pivot_betfair_odds(raw: pd.DataFrame) -> pd.DataFrame:

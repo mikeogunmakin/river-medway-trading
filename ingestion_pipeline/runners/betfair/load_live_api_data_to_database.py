@@ -13,8 +13,8 @@ from datetime import datetime
 import pandas as pd
 
 from data_sources.api_betfair import fetch_prematch_odds
-from ingestion.bronze_ingest import BRONZE_COLUMNS
-from ingestion.canonicalise import pivot_betfair_odds
+from ingestion_pipeline.bronze_ingest import BRONZE_COLUMNS
+from ingestion_pipeline.canonicalise import pivot_betfair_odds
 
 
 def from_betfair_api(

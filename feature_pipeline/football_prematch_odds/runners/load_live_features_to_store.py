@@ -12,9 +12,9 @@ from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 
-from ingestion.runners.betfair.load_live_api_data_to_database import from_betfair_api
-from ingestion.runners.betfair.selector import COMPETITION_IDS
-from ingestion.bronze_ingest import load_bronze, upsert_bronze
+from ingestion_pipeline.runners.betfair.load_live_api_data_to_database import from_betfair_api
+from ingestion_pipeline.runners.betfair.selector import COMPETITION_IDS
+from ingestion_pipeline.bronze_ingest import load_bronze, upsert_bronze
 from feature_pipeline.football_prematch_odds.features import build_features
 from feature_pipeline.football_prematch_odds.selectors import select_upcoming
 from feature_pipeline.football_prematch_odds.feature_store import write_to_feature_store
