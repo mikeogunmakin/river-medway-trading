@@ -1,213 +1,28 @@
 """
-Ingestion pipeline utilities — football prematch odds.
+Betfair Exchange API source — football prematch odds.
 
-Houses all shared functions:
-  - League code lookup
-  - Bronze storage (load, save, upsert, processed-files log)
-  - CSV odds column selection and Betfair odds pivoting
-  - Betfair Exchange API (auth, market discovery, odds fetching)
+Handles authentication, market discovery, and odds fetching from the
+Betfair Exchange REST API.
 """
 
-import json
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import requests
 from dotenv import load_dotenv
 
-from ingestion_pipeline.config import (
-    BETFAIR_API_URL,
-    LEAGUE_CODES,
-    MATCH_ODDS_MARKET_TYPE,
-    SOCCER_EVENT_TYPE_ID,
-)
-
 # ---------------------------------------------------------------------------
-# Paths
+# Constants
 # ---------------------------------------------------------------------------
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-BRONZE_PATH = _REPO_ROOT / ".data" / "bronze" / "football_prematch_odds.parquet"
-PROCESSED_LOG_PATH = _REPO_ROOT / ".data" / "bronze" / "processed_files.json"
+BETFAIR_API_URL = "https://api.betfair.com/exchange/betting/rest/v1.0"
+MATCH_ODDS_MARKET_TYPE = "MATCH_ODDS"
+SOCCER_EVENT_TYPE_ID = "1"
+SNAPSHOT_MINUTES_BEFORE = 60
 
 # ---------------------------------------------------------------------------
-# Bronze schema columns (enforced on every write)
-# ---------------------------------------------------------------------------
-
-BRONZE_COLUMNS = [
-    "date",
-    "league",
-    "home_team",
-    "away_team",
-    "home_win_odds",
-    "draw_odds",
-    "away_odds",
-    "result",
-    "source",
-]
-
-# Odds column priority — tried in order until one has data
-_ODDS_PRIORITY = [
-    ("BFEH", "BFED", "BFEA"),  # Betfair Exchange (preferred)
-    ("AvgH", "AvgD", "AvgA"),  # Market average
-    ("PSH",  "PSD",  "PSA"),   # Pinnacle (secondary fallback)
-]
-
-# ---------------------------------------------------------------------------
-# League lookup
-# ---------------------------------------------------------------------------
-
-
-def get_league_name(code: str) -> str:
-    """
-    Return the league name for a given football-data.co.uk code.
-
-    Raises:
-        KeyError: if the code is not in LEAGUE_CODES — add it to config.py.
-    """
-    if code not in LEAGUE_CODES:
-        raise KeyError(
-            f"Unknown league code '{code}'. Add it to ingestion_pipeline/config.py."
-        )
-    return LEAGUE_CODES[code]
-
-
-# ---------------------------------------------------------------------------
-# CSV odds column selection
-# ---------------------------------------------------------------------------
-
-
-def pick_odds_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Select odds columns in priority order: BFEH → AvgH → PSH.
-    Uses the first set where all three columns exist and have non-null data.
-
-    Raises:
-        ValueError: if no recognised odds columns are found in the CSV.
-    """
-    for h_col, d_col, a_col in _ODDS_PRIORITY:
-        cols = [h_col, d_col, a_col]
-        if all(c in df.columns for c in cols) and df[cols].notna().any().all():
-            df = df.copy()
-            df["home_win_odds"] = df[h_col]
-            df["draw_odds"] = df[d_col]
-            df["away_odds"] = df[a_col]
-            print(f"  Using odds columns: {h_col} / {d_col} / {a_col}")
-            return df
-
-    raise ValueError(
-        "No recognised odds columns found in CSV. "
-        "Expected one of: BFEH/BFED/BFEA, AvgH/AvgD/AvgA, PSH/PSD/PSA."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Betfair odds pivoting
-# ---------------------------------------------------------------------------
-
-
-def pivot_betfair_odds(raw: pd.DataFrame) -> pd.DataFrame:
-    """
-    Pivot runner-level Betfair data into one row per match.
-
-    Betfair MATCH_ODDS markets have three runners: home team, away team, Draw.
-    The event_name is 'Home Team v Away Team', which we use to identify sides.
-    """
-    rows = []
-
-    for (market_id, event_name, competition_name, market_start_time), group in raw.groupby(
-        ["market_id", "event_name", "competition_name", "market_start_time"]
-    ):
-        parts = str(event_name).split(" v ", maxsplit=1)
-        if len(parts) != 2:
-            continue
-
-        home_name, away_name = parts[0].strip(), parts[1].strip()
-
-        odds = {}
-        for _, runner in group.iterrows():
-            name = str(runner["runner_name"]).strip()
-            price = runner["best_back_price"]
-
-            if name == "The Draw":
-                odds["draw_odds"] = price
-            elif name == home_name:
-                odds["home_win_odds"] = price
-            elif name == away_name:
-                odds["away_odds"] = price
-
-        if len(odds) < 3:
-            continue
-
-        rows.append({
-            "date":          market_start_time,
-            "league":        competition_name,
-            "home_team":     home_name,
-            "away_team":     away_name,
-            "home_win_odds": odds["home_win_odds"],
-            "draw_odds":     odds["draw_odds"],
-            "away_odds":     odds["away_odds"],
-            "result":        None,
-            "source":        "betfair_api",
-        })
-
-    return pd.DataFrame(rows, columns=BRONZE_COLUMNS)
-
-
-# ---------------------------------------------------------------------------
-# Bronze storage
-# ---------------------------------------------------------------------------
-
-
-def load_bronze() -> pd.DataFrame:
-    """Load the existing bronze table, or return an empty DataFrame if none exists."""
-    if not BRONZE_PATH.exists():
-        return pd.DataFrame(columns=BRONZE_COLUMNS)
-    return pd.read_parquet(BRONZE_PATH)
-
-
-def save_bronze(df: pd.DataFrame) -> None:
-    """Save the full bronze table to parquet."""
-    BRONZE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(BRONZE_PATH, index=False)
-
-
-def upsert_bronze(new_df: pd.DataFrame) -> None:
-    """
-    Append new rows to the bronze table and deduplicate.
-
-    Deduplication key: (date, home_team, away_team).
-    Existing rows are preserved; new rows are appended only if not already present.
-    """
-    existing = load_bronze()
-    combined = pd.concat([existing, new_df], ignore_index=True)
-    combined = combined.drop_duplicates(subset=["date", "home_team", "away_team", "league"], keep="last")
-    combined = combined.sort_values("date").reset_index(drop=True)
-    save_bronze(combined)
-    print(f"Bronze table updated: {len(combined)} total rows.")
-
-
-# ---------------------------------------------------------------------------
-# Processed files log
-# ---------------------------------------------------------------------------
-
-
-def load_processed_log() -> set:
-    """Return the set of CSV filenames already loaded into bronze."""
-    if not PROCESSED_LOG_PATH.exists():
-        return set()
-    return set(json.loads(PROCESSED_LOG_PATH.read_text()))
-
-
-def save_processed_log(processed: set) -> None:
-    PROCESSED_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PROCESSED_LOG_PATH.write_text(json.dumps(sorted(processed), indent=2))
-
-
-# ---------------------------------------------------------------------------
-# Betfair API — authentication
+# Authentication
 # ---------------------------------------------------------------------------
 
 
@@ -249,7 +64,7 @@ def get_headers(session_token: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Betfair API — market discovery
+# Market discovery
 # ---------------------------------------------------------------------------
 
 
@@ -310,7 +125,7 @@ def get_match_odds_markets(
 
 
 # ---------------------------------------------------------------------------
-# Betfair API — odds fetching
+# Odds fetching
 # ---------------------------------------------------------------------------
 
 

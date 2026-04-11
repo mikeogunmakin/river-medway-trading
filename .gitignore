@@ -1,5 +1,5 @@
 .env
-.data/
+.database/
 __pycache__/
 *.pyc
 *.pyo

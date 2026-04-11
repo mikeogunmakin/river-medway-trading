@@ -1,10 +1,9 @@
 """
-Betfair ingestion pipeline — football prematch odds.
+Betfair runner — football prematch odds.
 
 Fetches live pre-match odds from the Betfair Exchange API and returns a
 bronze-schema DataFrame. Called by the feature pipeline as part of the
-daily run — does not write to bronze directly (the feature pipeline handles
-the upsert after calling this).
+daily run.
 
 Competition IDs to ingest are configured in feature_pipeline/config.py.
 """
@@ -13,7 +12,9 @@ from datetime import datetime
 
 import pandas as pd
 
-from ingestion_pipeline.utils import BRONZE_COLUMNS, fetch_prematch_odds, pivot_betfair_odds
+from data_sources.api_betfair import fetch_prematch_odds
+from ingestion.bronze_ingest import BRONZE_COLUMNS
+from ingestion.canonicalise import pivot_betfair_odds
 
 
 def from_betfair_api(

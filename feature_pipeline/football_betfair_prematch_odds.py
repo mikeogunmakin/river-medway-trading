@@ -11,8 +11,8 @@ from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 
-from ingestion_pipeline.football_betfair_prematch_odds import from_betfair_api
-from ingestion_pipeline.utils import load_bronze, upsert_bronze
+from ingestion.runners.betfair.load_live_api_data import from_betfair_api
+from ingestion.bronze_ingest import load_bronze, upsert_bronze
 from feature_pipeline.config import COMPETITION_IDS
 from feature_pipeline.features import build_features
 from feature_pipeline.feature_store_football_prematch_odds import write_to_feature_store

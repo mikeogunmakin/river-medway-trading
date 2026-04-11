@@ -7,7 +7,7 @@ Reads the bronze odds table, computes features via features.build_features,
 and writes the resulting feature group to Hopsworks.
 """
 
-from ingestion_pipeline.utils import load_bronze
+from ingestion.bronze_ingest import load_bronze
 from feature_pipeline.features import build_features
 from feature_pipeline.feature_store_football_prematch_odds import write_to_feature_store
 
