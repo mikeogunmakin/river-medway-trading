@@ -14,7 +14,7 @@ import pandas as pd
 # Leagues to include in the feature store.
 # Add league names here as you expand coverage.
 LEAGUES = [
-    "Premier League",
+    "English Premier League",
 ]
 
 

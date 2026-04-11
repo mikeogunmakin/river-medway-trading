@@ -17,7 +17,7 @@ import pandas as pd
 
 LEAGUE_CODES = {
     # England
-    "E0": "Premier League",
+    "E0": "English Premier League",
     "E1": "Championship",
     "E2": "League One",
     "E3": "League Two",
