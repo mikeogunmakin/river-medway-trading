@@ -140,9 +140,14 @@ def from_csv(csv_path: str) -> pd.DataFrame:
 
     df["league"] = df["Div"].map(get_league_name)
     df["source"] = "historical"
-    df["date"] = pd.to_datetime(df["date"], utc=True)
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    df["time"] = (
+        pd.to_datetime(df["Time"], format="%H:%M").dt.strftime("%H:%M")
+        if "Time" in df.columns
+        else "00:00"
+    )
 
-    bronze_columns = ["date", "league", "home_team", "away_team",
+    bronze_columns = ["date", "time", "league", "home_team", "away_team",
                       "home_win_odds", "draw_odds", "away_odds", "result", "source"]
 
     return df[bronze_columns].dropna(subset=["home_win_odds", "draw_odds", "away_odds"])

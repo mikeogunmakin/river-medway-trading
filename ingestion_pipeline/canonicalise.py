@@ -44,7 +44,8 @@ def pivot_betfair_odds(raw: pd.DataFrame) -> pd.DataFrame:
             continue
 
         rows.append({
-            "date":          market_start_time,
+            "date":          pd.Timestamp(market_start_time).date(),
+            "time":          pd.Timestamp(market_start_time).strftime("%H:%M"),
             "league":        competition_name,
             "home_team":     home_name,
             "away_team":     away_name,
@@ -52,7 +53,7 @@ def pivot_betfair_odds(raw: pd.DataFrame) -> pd.DataFrame:
             "draw_odds":     odds["draw_odds"],
             "away_odds":     odds["away_odds"],
             "result":        None,
-            "source":        "betfair_api",
+            "source":        "live",
         })
 
     return pd.DataFrame(rows, columns=BRONZE_COLUMNS)

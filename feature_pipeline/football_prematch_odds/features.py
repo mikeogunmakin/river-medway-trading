@@ -258,18 +258,14 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     fair_home, fair_draw, fair_away = normalised_odds(
         df["home_win_odds"], df["draw_odds"], df["away_odds"]
     )
+    df["fair_home_odds"] = fair_home
+    df["fair_draw_odds"] = fair_draw
+    df["fair_away_odds"] = fair_away
 
-    # Normalised probabilities — stored as features and used for implied probabilities and entropy
-    p_home, p_draw, p_away = normalised_prob(
-        df["home_win_odds"], df["draw_odds"], df["away_odds"]
-    )
-    df["p_home_norm"] = p_home
-    df["p_draw_norm"] = p_draw
-    df["p_away_norm"] = p_away
-
-    df["implied_prob_home"] = implied_probability(p_home)
-    df["implied_prob_draw"] = implied_probability(p_draw)
-    df["implied_prob_away"] = implied_probability(p_away)
+    # Implied probabilities of fair odds
+    df["implied_prob_home_win"] = implied_probability(fair_home)
+    df["implied_prob_draw"]     = implied_probability(fair_draw)
+    df["implied_prob_away_win"] = implied_probability(fair_away)
 
     df["odds_spread"]    = odds_spread(fair_home, fair_away)
     df["draw_margin"]    = draw_margin(fair_home, fair_draw, fair_away)
@@ -278,6 +274,10 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     df["home_vs_draw"]   = home_vs_draw(fair_home, fair_draw)
     df["away_vs_draw"]   = away_vs_draw(fair_away, fair_draw)
     df["odds_std"]       = odds_std(fair_home, fair_draw, fair_away)
-    df["market_entropy"] = market_entropy(p_home, p_draw, p_away)
+    df["market_entropy"] = market_entropy(
+        df["implied_prob_home_win"],
+        df["implied_prob_draw"],
+        df["implied_prob_away_win"],
+    )
 
     return df

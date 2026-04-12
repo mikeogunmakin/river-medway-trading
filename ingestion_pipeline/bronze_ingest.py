@@ -13,6 +13,7 @@ BRONZE_PATH = _REPO_ROOT / ".database" / "bronze" / "football_prematch_odds.parq
 
 BRONZE_COLUMNS = [
     "date",
+    "time",
     "league",
     "home_team",
     "away_team",
